@@ -55,160 +55,164 @@ with st.sidebar:
     st.markdown("[ClockTrades.com - Free Trading Tools](https://clocktrades.com/free-trading-tools/)")
     st.caption("*For educational purposes only*")
 
+# Put everything in a FORM
 
-# Trading System Setup Section
-col1, col2 = st.columns(2)
-with col1:
-    st.header("🧮 Strategy Setup")
-    st.subheader("Trading System")
-    win_probability_pct = st.slider(
-        "**Win Probability (%)**",
-        min_value=1,
-        max_value=100,
-        value=40,
-        help="Percentage of trades that are winners"
-    )
+with st.form(key="Setup calculations"):
+    # Trading System Setup Section
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("🧮 Strategy Setup")
+        st.subheader("Trading System")
+        win_probability_pct = st.slider(
+            "**Win Probability (%)**",
+            min_value=1,
+            max_value=100,
+            value=40,
+            help="Percentage of trades that are winners"
+        )
 
-    win_reward_R = st.slider(
-        "**Reward to Risk Ratio**",
-        min_value=0.1,
-        max_value=20.0,
-        value=2.0,
-        step=0.1,
-        help="Profit potential relative to your risk (e.g., 2.0 = 2:1 ratio)"
-    )
+        win_reward_R = st.slider(
+            "**Reward to Risk Ratio**",
+            min_value=0.1,
+            max_value=20.0,
+            value=2.0,
+            step=0.1,
+            help="Profit potential relative to your risk (e.g., 2.0 = 2:1 ratio)"
+        )
 
-    st.subheader("Time Horizon")
-    no_of_opportunities_per_period = st.slider(
-        "**Opportunities per Period**",
-        min_value=1,
-        max_value=100,
-        value=10,
-        help="Number of trading opportunities in a given time period"
-    )
+        st.subheader("Time Horizon")
+        no_of_opportunities_per_period = st.slider(
+            "**Opportunities per Period**",
+            min_value=1,
+            max_value=100,
+            value=10,
+            help="Number of trading opportunities in a given time period"
+        )
 
-    no_of_periods = st.slider(
-        "**Periods per Cycle**",
-        min_value=1,
-        max_value=200,
-        value=12,
-        help="Number of periods in each cycle (e.g., months in a year)"
-    )
+        no_of_periods = st.slider(
+            "**Periods per Cycle**",
+            min_value=1,
+            max_value=200,
+            value=12,
+            help="Number of periods in each cycle (e.g., months in a year)"
+        )
 
-    no_of_cycles = st.slider(
-        "**Number of Cycles**",
-        min_value=1,
-        max_value=50,
-        value=30,
-        help="Total cycles to simulate (e.g., years)"
-    )
+        no_of_cycles = st.slider(
+            "**Number of Cycles**",
+            min_value=1,
+            max_value=50,
+            value=30,
+            help="Total cycles to simulate (e.g., years)"
+        )
 
-with col2:
-    st.header("💰Account Management")
-    # Use list as an input for Period or Cycle choice
-    period_cycle_choice = ["Period", "Cycle"]
+    with col2:
+        st.header("💰Account Management")
+        # Use list as an input for Period or Cycle choice
+        period_cycle_choice = ["Period", "Cycle"]
 
-    # Container for account balance - we want to know starting balance and the users target
-    with st.container():
-        st.subheader("Capital Setup")
-        col_balance_1, col_balance_2 = st.columns(2)
-        with col_balance_1:
-            starting_account_balance = st.number_input(
-                "Starting Account Balance",
-                min_value=500,
-                max_value=1000000,
-                value=1000,
-                help="Initial trading capital"
-            )
-        with col_balance_2:
-            ending_account_balance = st.number_input(
-                "Ending Account Balance",
-                min_value=starting_account_balance,
-                max_value=100000000,
-                value=1000000,
-                help="Financial target"
-            )
+        # Container for account balance - we want to know starting balance and the users target
+        with st.container():
+            st.subheader("Capital Setup")
+            col_balance_1, col_balance_2 = st.columns(2)
+            with col_balance_1:
+                starting_account_balance = st.number_input(
+                    "Starting Account Balance",
+                    min_value=500,
+                    max_value=1000000,
+                    value=1000,
+                    help="Initial trading capital"
+                )
+            with col_balance_2:
+                ending_account_balance = st.number_input(
+                    "Ending Account Balance",
+                    min_value=starting_account_balance,
+                    max_value=100000000,
+                    value=1000000,
+                    help="Financial target"
+                )
 
-    # We want to know if user wants to add to the account per period or cycle
-    with st.container():
-        st.subheader("Cash Flows")
-        col_add_1, col_add_2 = st.columns(2)
-        with col_add_1:
-            add_to_account_value = st.number_input(
-                "Regular Contributions($)",
-                min_value=0,
-                max_value=10000,
-                value=0,
-                help="Amount added to account regularly"
-            )
-        with col_add_2:
-            add_to_account_period = st.segmented_control(
-                "Contribution Frequency",
-                period_cycle_choice,
-                key="Add period",
-                help="When contributions are made"
-            )
+        # We want to know if user wants to add to the account per period or cycle
+        with st.container():
+            st.subheader("Cash Flows")
+            col_add_1, col_add_2 = st.columns(2)
+            with col_add_1:
+                add_to_account_value = st.number_input(
+                    "Regular Contributions($)",
+                    min_value=0,
+                    max_value=10000,
+                    value=0,
+                    help="Amount added to account regularly"
+                )
+            with col_add_2:
+                add_to_account_period = st.segmented_control(
+                    "Contribution Frequency",
+                    period_cycle_choice,
+                    key="Add period",
+                    help="When contributions are made"
+                )
 
-    # We want to know if user wants to add to the account per period or cycle
-    with st.container():
-        col_withdraw_1, col_withdraw_2 = st.columns(2)
-        with col_withdraw_1:
-            withdraw_from_account_value = st.number_input(
-                "Regular Withdrawals ($)",
-                min_value=0,
-                max_value=10000,
-                value=0,
-                help="Amount withdrawn from account regularly"
-            )
-        with col_withdraw_2:
-            withdraw_from_account_period = st.segmented_control(
-                "Withdrawal Frequency",
-                period_cycle_choice,
-                key="Withdraw period",
-                help="User wants to withdraw certain amount of money to the account per Period or Cycle"
-            )
+        # We want to know if user wants to add to the account per period or cycle
+        with st.container():
+            col_withdraw_1, col_withdraw_2 = st.columns(2)
+            with col_withdraw_1:
+                withdraw_from_account_value = st.number_input(
+                    "Regular Withdrawals ($)",
+                    min_value=0,
+                    max_value=10000,
+                    value=0,
+                    help="Amount withdrawn from account regularly"
+                )
+            with col_withdraw_2:
+                withdraw_from_account_period = st.segmented_control(
+                    "Withdrawal Frequency",
+                    period_cycle_choice,
+                    key="Withdraw period",
+                    help="User wants to withdraw certain amount of money to the account per Period or Cycle"
+                )
 
-    # Tax
-    with st.container():
-        st.subheader("Risk & Tax Management")
-        col_tax_1, col_tax_2 = st.columns(2)
-        with col_tax_1:
-            tax_value_pct = st.slider(
-                "Capital Gains Tax",
-                min_value=0,
-                max_value=100,
-                value=0,
-                step=1,
-                help="Tax rate on profits"
-            )
-        with col_tax_2:
-            tax_period = st.segmented_control(
-                "Pay Tax every:",
-                period_cycle_choice,
-                key="Tax period",
-                help="When taxes are paid"
-            )
+        # Tax
+        with st.container():
+            st.subheader("Risk & Tax Management")
+            col_tax_1, col_tax_2 = st.columns(2)
+            with col_tax_1:
+                tax_value_pct = st.slider(
+                    "Capital Gains Tax",
+                    min_value=0,
+                    max_value=100,
+                    value=0,
+                    step=1,
+                    help="Tax rate on profits"
+                )
+            with col_tax_2:
+                tax_period = st.segmented_control(
+                    "Pay Tax every:",
+                    period_cycle_choice,
+                    key="Tax period",
+                    help="When taxes are paid"
+                )
 
-    # Risk Management
-    with st.container():
+        # Risk Management
+        with st.container():
 
-        col_risk_1, col_risk_2 = st.columns(2)
-        with col_risk_1:
-            user_risk_pct = st.number_input(
-                "Risk per trade as a % of bankroll",
-                min_value=0.1,
-                max_value=100.00,
-                value=2.0,
-                step=0.1,
-                help="Percentage of capital risked per trade"
-            )
-        with col_risk_2:
-            user_risk_adj_period = st.segmented_control(
-                "Adjust Risk every:",
-                period_cycle_choice,
-                key="Adjust risk period",
-                help="When risk percentage is recalculated"
-            )
+            col_risk_1, col_risk_2 = st.columns(2)
+            with col_risk_1:
+                user_risk_pct = st.number_input(
+                    "Risk per trade as a % of bankroll",
+                    min_value=0.1,
+                    max_value=100.00,
+                    value=2.0,
+                    step=0.1,
+                    help="Percentage of capital risked per trade"
+                )
+            with col_risk_2:
+                user_risk_adj_period = st.segmented_control(
+                    "Adjust Risk every:",
+                    period_cycle_choice,
+                    key="Adjust risk period",
+                    help="When risk percentage is recalculated"
+                )
+    st.form_submit_button("Calculate")
+# End of FORM
 
 # Calculations section:
 expectancy = calculate_expectancy(win_probability_pct, win_reward_R)
