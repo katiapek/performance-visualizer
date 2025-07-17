@@ -251,70 +251,82 @@ with visualisation_container:
     with tab1:
         # Create DataFrame for the compound rate results
         compound_interest_result_df = pd.DataFrame()
-        # Take start balance before entering the loop
-        start_balance = starting_account_balance
-        # Set the initial risk before entering the loop
-        risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
 
         # Enter the loop - cycles contains periods
         list_of_possible_R_outcomes = [win_reward_R, -1]
-        for cycle in range(1, no_of_cycles+1):
-            return_per_cycle = []
-            # Generate list of trade outcomes per cycle
-            list_of_trade_outcomes = random.choices(
-                list_of_possible_R_outcomes,
-                weights=[win_probability_pct, 100-win_probability_pct],
-                k=no_of_opportunities_per_period*no_of_periods
-            )
+        for simulation in range(100):
+            # Take start balance before entering the new cycle loop
+            start_balance = starting_account_balance
+            # Set the initial risk before entering the new cycle loop
+            risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
 
-            for period in range(1, no_of_periods+1):
-                # Work only until the account target has been reached
-                if (start_balance >= ending_account_balance) or (start_balance <= 0):
-                    break
-                # Adjust risk if user adapts risk per cycle or per period in other cases or never it nothing is chosen
-                if (period == 1) and (user_risk_adj_period == "Cycle"):
-                    risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
-                elif user_risk_adj_period == "Period":
-                    risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
-                else:
-                    risk_per_trade = risk_per_trade
+            for cycle in range(1, no_of_cycles+1):
+                return_per_cycle = []
+                # Generate list of trade outcomes per cycle
+                list_of_trade_outcomes = random.choices(
+                    list_of_possible_R_outcomes,
+                    weights=[win_probability_pct, 100-win_probability_pct],
+                    k=no_of_opportunities_per_period*no_of_periods
+                )
 
-                # Calculations required per period
-                real_r_return_per_period = sum(list_of_trade_outcomes[period*no_of_opportunities_per_period-no_of_opportunities_per_period:period*no_of_opportunities_per_period])
-                return_on_period = real_r_return_per_period * risk_per_trade
-                return_per_cycle.append(return_on_period)
-                tax_withheld = round(return_on_period * tax_value_pct / 100, 0) if tax_period == "Period" else 0
-                add_to_account = add_to_account_value if add_to_account_period == "Period" else 0
-                withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Period" else 0
+                for period in range(1, no_of_periods+1):
+                    # Work only until the account target has been reached
+                    if (start_balance >= ending_account_balance) or (start_balance <= 0):
+                        break
+                    # Adjust risk if user adapts risk per cycle or per period in other cases or never it nothing is chosen
+                    if (period == 1) and (user_risk_adj_period == "Cycle"):
+                        risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
+                    elif user_risk_adj_period == "Period":
+                        risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
+                    else:
+                        risk_per_trade = risk_per_trade
 
-                # Calculations required if user choose Cycle in some cases rather than Period
-                if period == no_of_periods:
-                    add_to_account = add_to_account_value if add_to_account_period == "Cycle" else add_to_account
-                    withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Cycle" else withdraw_from_account
-                    tax_withheld = sum(return_per_cycle) * tax_value_pct / 100 if tax_period == "Cycle" else tax_withheld
+                    # Calculations required per period
+                    real_r_return_per_period = sum(list_of_trade_outcomes[period*no_of_opportunities_per_period-no_of_opportunities_per_period:period*no_of_opportunities_per_period])
+                    return_on_period = real_r_return_per_period * risk_per_trade
+                    return_per_cycle.append(return_on_period)
+                    tax_withheld = round(return_on_period * tax_value_pct / 100, 0) if tax_period == "Period" else 0
+                    add_to_account = add_to_account_value if add_to_account_period == "Period" else 0
+                    withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Period" else 0
 
-                end_balance = round(start_balance + return_on_period + add_to_account - withdraw_from_account - tax_withheld, 0)
+                    # Calculations required if user choose Cycle in some cases rather than Period
+                    if period == no_of_periods:
+                        add_to_account = add_to_account_value if add_to_account_period == "Cycle" else add_to_account
+                        withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Cycle" else withdraw_from_account
+                        tax_withheld = sum(return_per_cycle) * tax_value_pct / 100 if tax_period == "Cycle" else tax_withheld
 
-                # Create new row per each period and later concatenate it with the existing DataFrame
-                new_row_df = pd.DataFrame(
-                    {
-                        "Cycle": cycle,
-                        "Period": period,
-                        "Starting Balance": start_balance,
-                        "Risk": risk_per_trade,
-                        "Return": return_on_period,
-                        "Added": add_to_account,
-                        "Withdrawn": withdraw_from_account,
-                        "Tax": tax_withheld,
-                        "Ending Balance": end_balance
-                    },
-                    index=[0])
-                compound_interest_result_df = pd.concat([compound_interest_result_df, new_row_df], ignore_index=True)
-                start_balance = end_balance
+                    end_balance = round(start_balance + return_on_period + add_to_account - withdraw_from_account - tax_withheld, 0)
+
+                    # Create new row per each period and later concatenate it with the existing DataFrame
+                    new_row_df = pd.DataFrame(
+                        {
+                            "Sim": simulation,
+                            "Cycle": cycle,
+                            "Period": period,
+                            "Starting Balance": start_balance,
+                            "Risk": risk_per_trade,
+                            "Return": return_on_period,
+                            "Added": add_to_account,
+                            "Withdrawn": withdraw_from_account,
+                            "Tax": tax_withheld,
+                            "Ending Balance": end_balance
+                        },
+                        index=[0])
+
+                    compound_interest_result_df = pd.concat([compound_interest_result_df, new_row_df], ignore_index=True)
+                    compound_interest_result_df['Peak Balance'] = compound_interest_result_df.groupby('Sim')['Ending Balance'].cummax()
+                    compound_interest_result_df['Drawdown'] = compound_interest_result_df['Peak Balance'] - compound_interest_result_df['Ending Balance']
+                    compound_interest_result_df['Drawdown pct'] = round((compound_interest_result_df['Peak Balance'] - compound_interest_result_df['Ending Balance'])
+                                                                   / compound_interest_result_df['Peak Balance'] * 100, 1)
+
+                    start_balance = end_balance
 
         # Show DataFrame
+        sim_to_show = st.slider("Simulation number to show",0,99,0)
+        run_to_show_df = compound_interest_result_df[compound_interest_result_df["Sim"] == sim_to_show]
+
         st.dataframe(
-            compound_interest_result_df.style.format(
+            run_to_show_df.style.format(
                 {
                     "Starting Balance": "${:,.0f}",
                     "Risk": "${:,.0f}",
@@ -322,7 +334,10 @@ with visualisation_container:
                     "Added": "${:,.0f}",
                     "Withdrawn": "${:,.0f}",
                     "Tax": "${:,.0f}",
-                    "Ending Balance": "${:,.0f}"
+                    "Ending Balance": "${:,.0f}",
+                    "Peak Balance": "${:,.0f}",
+                    "Drawdown": "(${:,.0f})",
+                    "Drawdown pct": "{:,.1f}%",
                 }
             ),
             hide_index=True, use_container_width=True)
@@ -332,8 +347,8 @@ with visualisation_container:
         fig = go.Figure()
 
         fig.add_trace(go.Scatter(
-            x=compound_interest_result_df.index,
-            y=compound_interest_result_df["Ending Balance"],
+            x=run_to_show_df.index,
+            y=run_to_show_df["Ending Balance"],
             mode="lines",
             line=dict(color='#3498db', width=3),
             hovertemplate="Cycle: %{customdata[0]}<br>Period: %{customdata[1]}<br>Balance: $%{y:,.0f}<extra></extra>",
