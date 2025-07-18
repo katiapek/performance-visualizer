@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import random
-from collections import Counter
 
 # Page headers
 st.set_page_config(page_title="Trading Strategy Performance Visualizer", layout="wide", page_icon="📈")
@@ -225,7 +224,7 @@ with strategy_container:
 
 # Visualisation section
 visualisation_container = st.container()
-with ((((visualisation_container)))):
+with (visualisation_container):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
     **Visualizing how your trading strategy compounds over time**  
@@ -233,14 +232,14 @@ with ((((visualisation_container)))):
     """)
 
     # Present data in tabs - one for table and one for chart
-    tab1, tab2, tab3 = st.tabs(["DataTable", "Chart", "Summary"])
+    tab1, tab2, tab3, tab4 = st.tabs(["DataTable", "Chart", "Summary Table", "Summary"])
     with tab1:
         # Create DataFrame for the compound rate results
         compound_interest_result_df = pd.DataFrame()
 
         # Enter the loop - cycles contains periods
         list_of_possible_R_outcomes = [win_reward_R, -1]
-        for simulation in range(1,101):
+        for simulation in range(1, 101):
             # Take start balance before entering the new cycle loop
             start_balance = starting_account_balance
             # Set the initial risk before entering the new cycle loop
@@ -270,8 +269,7 @@ with ((((visualisation_container)))):
 
                     # Calculations required per period
                     list_of_trade_outcomes_in_period = list_of_trade_outcomes[
-                        period*no_of_opportunities_per_period-no_of_opportunities_per_period
-                        :period*no_of_opportunities_per_period]
+                        period*no_of_opportunities_per_period-no_of_opportunities_per_period:period*no_of_opportunities_per_period]
                     real_r_return_per_period = sum(list_of_trade_outcomes_in_period)
 
                     no_of_wins_in_period = list_of_trade_outcomes_in_period.count(list_of_possible_R_outcomes[0])
@@ -312,14 +310,31 @@ with ((((visualisation_container)))):
                     compound_interest_result_df = pd.concat([compound_interest_result_df, new_row_df], ignore_index=True)
                     compound_interest_result_df['Peak Balance'] = compound_interest_result_df.groupby('Sim')['End Balance'].cummax()
                     compound_interest_result_df['Drawdown'] = compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance']
-                    compound_interest_result_df['Drawdown pct'] = round((compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance'])
-                                                                   / compound_interest_result_df['Peak Balance'] * 100, 1)
+                    compound_interest_result_df['Drawdown pct'] = round(
+                        (compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance']) /
+                        compound_interest_result_df['Peak Balance'] * 100, 1)
 
                     start_balance = end_balance
 
         # Show DataFrame
-        sim_to_show = st.slider("Simulation number to show", 1, 100, 1)
-        run_to_show_df = compound_interest_result_df[compound_interest_result_df["Sim"] == sim_to_show]
+        # sim_to_show = st.number_input("Simulation number to show", 1, 100, 1, key="sim_no_choice")
+
+        if "sim_to_show" not in st.session_state:
+            st.session_state.sim_to_show=1
+
+        col1a, col2a = st.columns(2)
+        with col1a:
+            if st.button("Previous"):
+                st.session_state.sim_to_show = max(1, st.session_state.sim_to_show - 1)
+        with col2a:
+            if st.button("Next"):
+                st.session_state.sim_to_show = min(100, st.session_state.sim_to_show + 1)
+
+        st.write(f"Showing simulation: {st.session_state.sim_to_show}")
+
+        # st.session_state.sim_to_show = st.number_input("Simulation number to show", 1, 100, 1)
+
+        run_to_show_df = compound_interest_result_df[compound_interest_result_df["Sim"] == st.session_state.sim_to_show]
 
         st.dataframe(
             run_to_show_df.style.format(
@@ -373,7 +388,7 @@ with ((((visualisation_container)))):
             template="plotly_white",
 
         )
-        st.plotly_chart(fig, config={"displayModeBar" : False}, use_container_width=True)
+        st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         # else:
         #     st.warning("This expectancy value is not mathematically possible with positive risk:reward ratios")
 
@@ -399,6 +414,28 @@ with ((((visualisation_container)))):
                     "MAX_Drawdown_pct": "{:,.1f}%",
                 }
             ))
+
+    # Summary statistics
+    with tab4:
+        no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
+        min_end_balance = no_ruin_summary_df["END_Balance"].min()
+        max_end_balance = no_ruin_summary_df["END_Balance"].max()
+        avg_end_balance = no_ruin_summary_df["END_Balance"].mean()
+        risk_of_ruin_pct = len(summary_df[summary_df["END_Balance"] <= 0])
+        avg_return_period = no_ruin_summary_df["AVG_Return"].mean()
+        max_drawdown = no_ruin_summary_df["MAX_Drawdown"].max()
+        min_drawdown = no_ruin_summary_df["MAX_Drawdown"].min()
+        avg_drawdown = no_ruin_summary_df["MAX_Drawdown"].mean()
+
+        st.metric("Minimum End Balance", f"${min_end_balance}", help="The lowest of the ending balances")
+        st.metric("Maximum End Balance", f"${max_end_balance}", help="The highest of the ending balances")
+        st.metric("Average End Balance", f"${avg_end_balance}", help="The average of the ending balances")
+        st.metric("Risk of Ruin", f"{risk_of_ruin_pct}%", help="Chances of account blowout")
+        st.metric("Average Return Per Period", f"${avg_return_period}", help="Average expected return per Period")
+        st.metric("Minimum Drawdown", f"${min_drawdown}", help="The lowest of the drawdowns")
+        st.metric("Maximum Drawdown", f"${max_drawdown}", help="The highest of the drawdowns")
+        st.metric("Average Drawdown", f"${avg_drawdown}", help="The average of the drawdowns")
+
 
 # Explanation
 with st.expander("💡 How to Interpret These Results"):
