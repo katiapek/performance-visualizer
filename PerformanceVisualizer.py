@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import random
+from collections import Counter
 
 # Page headers
 st.set_page_config(page_title="Trading Strategy Performance Visualizer", layout="wide", page_icon="📈")
@@ -11,17 +12,6 @@ st.markdown("""
 **Visualize how ...**  
 *This calculator visualizes...*
 """)
-
-# Custom CSS
-# st.markdown("""
-# <style>
-# .main {background-color: #f5f5f5;}
-# h1 {color: #1e3a8a; font-family: 'Arial', sans-serif;}
-# h2 {color: #1e3a8a;}
-# .stButton>button {background-color: #2563eb; color: white; border-radius: 5px;}
-# .stSlider .st-bx {background-color: #bfdbfe;}
-# </style>
-# """, unsafe_allow_html=True)
 
 
 def calculate_expectancy(win_probability, win_reward):
@@ -34,15 +24,12 @@ def calculate_kelly_criterion(win_probability, win_reward):
     return round((win_decimal-(loss_decimal/win_reward)), 4)
 
 
-
-
-# Sidebar with information
 # Sidebar
 with st.sidebar:
     st.header("About Performance")
     st.markdown("""
     **Formula**: `Earn and not ruin (lol)`
-    - **A**: Ending balance
+    - **A**: End balance
     - **P**: Starting balance
     - **r**: Expected return per period (based on expectancy)
     - **n**: Number of compounding periods per cycle
@@ -56,7 +43,6 @@ with st.sidebar:
     st.caption("*For educational purposes only*")
 
 # Put everything in a FORM
-
 with st.form(key="Setup calculations"):
     # Trading System Setup Section
     col1, col2 = st.columns(2)
@@ -116,7 +102,7 @@ with st.form(key="Setup calculations"):
             col_balance_1, col_balance_2 = st.columns(2)
             with col_balance_1:
                 starting_account_balance = st.number_input(
-                    "Starting Account Balance",
+                    "Start Account Balance",
                     min_value=500,
                     max_value=1000000,
                     value=1000,
@@ -124,7 +110,7 @@ with st.form(key="Setup calculations"):
                 )
             with col_balance_2:
                 ending_account_balance = st.number_input(
-                    "Ending Account Balance",
+                    "End Account Balance",
                     min_value=starting_account_balance,
                     max_value=100000000,
                     value=1000000,
@@ -224,7 +210,7 @@ kelly_percentage = max(0, kelly_percentage)
 strategy_container = st.container()
 
 with strategy_container:
-    st.header("📊 Strategy Performance Summary")
+    st.header("📊 Strategy Performance Assumptions")
     col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
     with col_metric1:
         st.metric("Expectancy per Trade", f"{expectancy}R", help="Average return per $1 risked")
@@ -239,7 +225,7 @@ with strategy_container:
 
 # Visualisation section
 visualisation_container = st.container()
-with visualisation_container:
+with ((((visualisation_container)))):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
     **Visualizing how your trading strategy compounds over time**  
@@ -247,14 +233,14 @@ with visualisation_container:
     """)
 
     # Present data in tabs - one for table and one for chart
-    tab1, tab2 = st.tabs(["DataTable", "Chart"])
+    tab1, tab2, tab3 = st.tabs(["DataTable", "Chart", "Summary"])
     with tab1:
         # Create DataFrame for the compound rate results
         compound_interest_result_df = pd.DataFrame()
 
         # Enter the loop - cycles contains periods
         list_of_possible_R_outcomes = [win_reward_R, -1]
-        for simulation in range(100):
+        for simulation in range(1,101):
             # Take start balance before entering the new cycle loop
             start_balance = starting_account_balance
             # Set the initial risk before entering the new cycle loop
@@ -273,7 +259,8 @@ with visualisation_container:
                     # Work only until the account target has been reached
                     if (start_balance >= ending_account_balance) or (start_balance <= 0):
                         break
-                    # Adjust risk if user adapts risk per cycle or per period in other cases or never it nothing is chosen
+                    # Adjust risk if user adapts risk per cycle or per period
+                    # in other cases or never it nothing is chosen
                     if (period == 1) and (user_risk_adj_period == "Cycle"):
                         risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
                     elif user_risk_adj_period == "Period":
@@ -282,7 +269,13 @@ with visualisation_container:
                         risk_per_trade = risk_per_trade
 
                     # Calculations required per period
-                    real_r_return_per_period = sum(list_of_trade_outcomes[period*no_of_opportunities_per_period-no_of_opportunities_per_period:period*no_of_opportunities_per_period])
+                    list_of_trade_outcomes_in_period = list_of_trade_outcomes[
+                        period*no_of_opportunities_per_period-no_of_opportunities_per_period
+                        :period*no_of_opportunities_per_period]
+                    real_r_return_per_period = sum(list_of_trade_outcomes_in_period)
+
+                    no_of_wins_in_period = list_of_trade_outcomes_in_period.count(list_of_possible_R_outcomes[0])
+                    no_of_loses_in_period = len(list_of_trade_outcomes_in_period) - no_of_wins_in_period
                     return_on_period = real_r_return_per_period * risk_per_trade
                     return_per_cycle.append(return_on_period)
                     tax_withheld = round(return_on_period * tax_value_pct / 100, 0) if tax_period == "Period" else 0
@@ -303,38 +296,44 @@ with visualisation_container:
                             "Sim": simulation,
                             "Cycle": cycle,
                             "Period": period,
-                            "Starting Balance": start_balance,
+                            "Wins": no_of_wins_in_period,
+                            "Losses": no_of_loses_in_period,
+                            "Win Rate": no_of_wins_in_period / len(list_of_trade_outcomes_in_period) * 100,
+                            "Start Balance": start_balance,
                             "Risk": risk_per_trade,
                             "Return": return_on_period,
                             "Added": add_to_account,
                             "Withdrawn": withdraw_from_account,
                             "Tax": tax_withheld,
-                            "Ending Balance": end_balance
+                            "End Balance": end_balance
                         },
                         index=[0])
 
                     compound_interest_result_df = pd.concat([compound_interest_result_df, new_row_df], ignore_index=True)
-                    compound_interest_result_df['Peak Balance'] = compound_interest_result_df.groupby('Sim')['Ending Balance'].cummax()
-                    compound_interest_result_df['Drawdown'] = compound_interest_result_df['Peak Balance'] - compound_interest_result_df['Ending Balance']
-                    compound_interest_result_df['Drawdown pct'] = round((compound_interest_result_df['Peak Balance'] - compound_interest_result_df['Ending Balance'])
+                    compound_interest_result_df['Peak Balance'] = compound_interest_result_df.groupby('Sim')['End Balance'].cummax()
+                    compound_interest_result_df['Drawdown'] = compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance']
+                    compound_interest_result_df['Drawdown pct'] = round((compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance'])
                                                                    / compound_interest_result_df['Peak Balance'] * 100, 1)
 
                     start_balance = end_balance
 
         # Show DataFrame
-        sim_to_show = st.slider("Simulation number to show",0,99,0)
+        sim_to_show = st.slider("Simulation number to show", 1, 100, 1)
         run_to_show_df = compound_interest_result_df[compound_interest_result_df["Sim"] == sim_to_show]
 
         st.dataframe(
             run_to_show_df.style.format(
                 {
-                    "Starting Balance": "${:,.0f}",
+                    "Start Balance": "${:,.0f}",
+                    "Wins": "{:,.0f}",
+                    "Losses": "{:,.0f}",
+                    "Win Rate": "{:,.1f}%",
                     "Risk": "${:,.0f}",
                     "Return": "${:,.0f}",
                     "Added": "${:,.0f}",
                     "Withdrawn": "${:,.0f}",
                     "Tax": "${:,.0f}",
-                    "Ending Balance": "${:,.0f}",
+                    "End Balance": "${:,.0f}",
                     "Peak Balance": "${:,.0f}",
                     "Drawdown": "(${:,.0f})",
                     "Drawdown pct": "{:,.1f}%",
@@ -348,7 +347,7 @@ with visualisation_container:
 
         fig.add_trace(go.Scatter(
             x=run_to_show_df.index,
-            y=run_to_show_df["Ending Balance"],
+            y=run_to_show_df["End Balance"],
             mode="lines",
             line=dict(color='#3498db', width=3),
             hovertemplate="Cycle: %{customdata[0]}<br>Period: %{customdata[1]}<br>Balance: $%{y:,.0f}<extra></extra>",
@@ -356,14 +355,14 @@ with visualisation_container:
 
         ))
 
-        # Target line
-        fig.add_hline(
-            y=ending_account_balance,
-            line_dash="dash",
-            line_color="green",
-            annotation_text=f"Target: ${ending_account_balance:,.0f}",
-            annotation_position="bottom right"
-        )
+        # # Target line
+        # fig.add_hline(
+        #     y=ending_account_balance,
+        #     line_dash="dash",
+        #     line_color="green",
+        #     annotation_text=f"Target: ${ending_account_balance:,.0f}",
+        #     annotation_position="bottom right"
+        # )
 
         # Update layout
         fig.update_layout(
@@ -378,6 +377,28 @@ with visualisation_container:
         # else:
         #     st.warning("This expectancy value is not mathematically possible with positive risk:reward ratios")
 
+    with tab3:
+        summary_df = compound_interest_result_df.groupby("Sim").agg(
+            END_Cycle=("Cycle", "last"),
+            END_Period=("Period", "last"),
+            END_Balance=("End Balance", "last"),
+            AVG_Return=("Return", "mean"),
+            AVG_WinRate=("Win Rate", "mean"),
+            MAX_Drawdown=("Drawdown", "max"),
+            MAX_Drawdown_pct=("Drawdown pct", "max")
+        )
+        st.dataframe(
+            summary_df.style.format(
+                {
+                    "END_Cycle": "{:,.0f}",
+                    "END_Period": "{:,.0f}",
+                    "END_Balance": "${:,.0f}",
+                    "AVG_Return": "${:,.0f}",
+                    "AVG_WinRate": "{:,.1f}%",
+                    "MAX_Drawdown": "${:,.0f}",
+                    "MAX_Drawdown_pct": "{:,.1f}%",
+                }
+            ))
 
 # Explanation
 with st.expander("💡 How to Interpret These Results"):
@@ -385,7 +406,7 @@ with st.expander("💡 How to Interpret These Results"):
     Your trading strategy's performance is modeled using the **compound interest formula** adapted for trading risk:
 
     **Formula**: `A = P × (1 + r/n)^(n×t)`
-    - **A**: Ending balance
+    - **A**: End balance
     - **P**: Starting balance ({starting_account_balance:,.0f})
     - **r**: Expected return per period ({r_return_per_period:.1f}R)
     - **n**: Opportunities per period ({no_of_opportunities_per_period})
@@ -394,7 +415,7 @@ with st.expander("💡 How to Interpret These Results"):
     **Key Insights**:
     - **Expectancy**: {expectancy:.2f}R per trade
     - **Kelly Criterion**: Risk {kelly_percentage:.2f}% per trade (half-Kelly: {kelly_percentage/2:.2f}%)
-    - **Ending Balance**: {compound_interest_result_df['Ending Balance'].iloc[-1]:,.0f}
+    - **End Balance**: {compound_interest_result_df['End Balance'].iloc[-1]:,.0f}
     - **Risk Management**: Adjust risk per {user_risk_adj_period} for balance.
     """)
 
