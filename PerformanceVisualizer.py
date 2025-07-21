@@ -270,7 +270,7 @@ def create_user_form():
                         key="Adjust risk period",
                         help="When risk percentage is recalculated"
                     )
-        st.form_submit_button("Calculate")
+        st.form_submit_button("Calculate", on_click=clear_session_state)
     # End of FORM
     return {'win_probability_pct': win_probability_pct,
             'win_reward_R': win_reward_R,
@@ -288,6 +288,11 @@ def create_user_form():
             'user_risk_pct': user_risk_pct,
             'user_risk_adj_period': user_risk_adj_period
             }
+
+
+def clear_session_state():
+    st.session_state.sim_to_show = 1
+    return st.session_state.sim_to_show
 
 
 # Sidebar
@@ -422,7 +427,7 @@ with (visualisation_container):
 
         # Update layout
         fig.update_layout(
-            title="Account Growth Over Time",
+            title=f"Account Growth Over Time for Simulation no {st.session_state.sim_to_show}",
             xaxis_title="Period Sequence",
             yaxis_title="Account Balance ($)",
             hovermode="x unified",
