@@ -23,6 +23,273 @@ def calculate_kelly_criterion(win_probability, win_reward):
     return round((win_decimal-(loss_decimal/win_reward)), 4)
 
 
+@st.cache_data
+def calculate_simulated_results(win_probability, win_reward_r, no_of_opportunities, no_periods,
+                                no_cycles, starting_balance, ending_balance,
+                                add_value, add_period,
+                                withdraw_value, withdraw_period,
+                                taxes_value, taxes_period, user_risk, user_risk_period):
+
+    # Create DataFrame for the compound rate results
+    result_df = pd.DataFrame()
+
+    # Enter the loop - cycles contains periods
+    list_of_possible_r_outcomes = [win_reward_r, -1]
+    for simulation in range(1, 101):
+        start_balance = starting_balance
+        # Set the initial risk before entering the new cycle loop
+        risk_per_trade = round(start_balance * user_risk / 100, 0)
+
+        for cycle in range(1, no_cycles + 1):
+            return_per_cycle = []
+            # Generate list of trade outcomes per cycle
+            list_of_trade_outcomes = random.choices(
+                list_of_possible_r_outcomes,
+                weights=[win_probability, 100 - win_probability],
+                k=no_of_opportunities * no_periods
+            )
+
+            for period in range(1, no_periods + 1):
+                # Work only until the account target has been reached
+                if (start_balance >= ending_balance) or (start_balance <= 0):
+                    break
+                # Adjust risk if user adapts risk per cycle or per period
+                # in other cases or never it nothing is chosen
+                if (period == 1) and (user_risk_period == "Cycle"):
+                    risk_per_trade = round(start_balance * user_risk / 100, 0)
+                elif user_risk_period == "Period":
+                    risk_per_trade = round(start_balance * user_risk / 100, 0)
+                else:
+                    risk_per_trade = risk_per_trade
+
+                # Calculations required per period
+                list_of_trade_outcomes_in_period = list_of_trade_outcomes[
+                                                   period * no_of_opportunities - no_of_opportunities:period * no_of_opportunities]
+                real_r_return_per_period = sum(list_of_trade_outcomes_in_period)
+
+                no_of_wins_in_period = list_of_trade_outcomes_in_period.count(list_of_possible_r_outcomes[0])
+                no_of_loses_in_period = len(list_of_trade_outcomes_in_period) - no_of_wins_in_period
+                return_on_period = real_r_return_per_period * risk_per_trade
+                return_per_cycle.append(return_on_period)
+                tax_withheld = round(return_on_period * taxes_value / 100, 0) if taxes_period == "Period" else 0
+                add_to_account = add_value if add_period == "Period" else 0
+                withdraw_from_account = withdraw_value if withdraw_period == "Period" else 0
+
+                # Calculations required if user choose Cycle in some cases rather than Period
+                if period == no_periods:
+                    add_to_account = add_value if add_period == "Cycle" else add_to_account
+                    withdraw_from_account = withdraw_value if withdraw_period == "Cycle" else withdraw_from_account
+                    tax_withheld = sum(
+                        return_per_cycle) * taxes_value / 100 if taxes_period == "Cycle" else tax_withheld
+
+                end_balance = round(
+                    start_balance + return_on_period + add_to_account - withdraw_from_account - tax_withheld, 0)
+
+                # Create new row per each period and later concatenate it with the existing DataFrame
+                new_row_df = pd.DataFrame(
+                    {
+                        "Sim": simulation,
+                        "Cycle": cycle,
+                        "Period": period,
+                        "Wins": no_of_wins_in_period,
+                        "Losses": no_of_loses_in_period,
+                        "Win Rate": no_of_wins_in_period / len(list_of_trade_outcomes_in_period) * 100,
+                        "Start Balance": start_balance,
+                        "Risk": risk_per_trade,
+                        "Return": return_on_period,
+                        "Added": add_to_account,
+                        "Withdrawn": withdraw_from_account,
+                        "Tax": tax_withheld,
+                        "End Balance": end_balance
+                    },
+                    index=[0])
+
+                result_df = pd.concat([result_df, new_row_df], ignore_index=True)
+                result_df['Peak Balance'] = result_df.groupby('Sim')[
+                    'End Balance'].cummax()
+                result_df['Drawdown'] = result_df['Peak Balance'] - result_df['End Balance']
+                result_df['Drawdown pct'] = round(
+                    (result_df['Peak Balance'] - result_df['End Balance']) / result_df['Peak Balance'] * 100, 1)
+
+                start_balance = end_balance
+
+    return result_df
+
+
+def create_user_form():
+    with st.form(key="Setup calculations"):
+        # Trading System Setup Section
+        col1, col2 = st.columns(2)
+        with col1:
+            st.header("🧮 Strategy Setup")
+            st.subheader("Trading System")
+            win_probability_pct = st.slider(
+                "**Win Probability (%)**",
+                min_value=1,
+                max_value=100,
+                value=40,
+                help="Percentage of trades that are winners"
+            )
+
+            win_reward_R = st.slider(
+                "**Reward to Risk Ratio**",
+                min_value=0.1,
+                max_value=20.0,
+                value=2.0,
+                step=0.1,
+                help="Profit potential relative to your risk (e.g., 2.0 = 2:1 ratio)"
+            )
+
+            st.subheader("Time Horizon")
+            no_of_opportunities_per_period = st.slider(
+                "**Opportunities per Period**",
+                min_value=1,
+                max_value=100,
+                value=10,
+                help="Number of trading opportunities in a given time period"
+            )
+
+            no_of_periods = st.slider(
+                "**Periods per Cycle**",
+                min_value=1,
+                max_value=200,
+                value=12,
+                help="Number of periods in each cycle (e.g., months in a year)"
+            )
+
+            no_of_cycles = st.slider(
+                "**Number of Cycles**",
+                min_value=1,
+                max_value=50,
+                value=30,
+                help="Total cycles to simulate (e.g., years)"
+            )
+
+        with col2:
+            st.header("💰Account Management")
+            # Use list as an input for Period or Cycle choice
+            period_cycle_choice = ["Period", "Cycle"]
+
+            # Container for account balance - we want to know starting balance and the users target
+            with st.container():
+                st.subheader("Capital Setup")
+                col_balance_1, col_balance_2 = st.columns(2)
+                with col_balance_1:
+                    starting_account_balance = st.number_input(
+                        "Start Account Balance",
+                        min_value=500,
+                        max_value=1000000,
+                        value=1000,
+                        help="Initial trading capital"
+                    )
+                with col_balance_2:
+                    ending_account_balance = st.number_input(
+                        "End Account Balance",
+                        min_value=starting_account_balance,
+                        max_value=100000000,
+                        value=1000000,
+                        help="Financial target"
+                    )
+
+            # We want to know if user wants to add to the account per period or cycle
+            with st.container():
+                st.subheader("Cash Flows")
+                col_add_1, col_add_2 = st.columns(2)
+                with col_add_1:
+                    add_to_account_value = st.number_input(
+                        "Regular Contributions($)",
+                        min_value=0,
+                        max_value=10000,
+                        value=0,
+                        help="Amount added to account regularly"
+                    )
+                with col_add_2:
+                    add_to_account_period = st.segmented_control(
+                        "Contribution Frequency",
+                        period_cycle_choice,
+                        key="Add period",
+                        help="When contributions are made"
+                    )
+
+            # We want to know if user wants to add to the account per period or cycle
+            with st.container():
+                col_withdraw_1, col_withdraw_2 = st.columns(2)
+                with col_withdraw_1:
+                    withdraw_from_account_value = st.number_input(
+                        "Regular Withdrawals ($)",
+                        min_value=0,
+                        max_value=10000,
+                        value=0,
+                        help="Amount withdrawn from account regularly"
+                    )
+                with col_withdraw_2:
+                    withdraw_from_account_period = st.segmented_control(
+                        "Withdrawal Frequency",
+                        period_cycle_choice,
+                        key="Withdraw period",
+                        help="User wants to withdraw certain amount of money to the account per Period or Cycle"
+                    )
+
+            # Tax
+            with st.container():
+                st.subheader("Risk & Tax Management")
+                col_tax_1, col_tax_2 = st.columns(2)
+                with col_tax_1:
+                    tax_value_pct = st.slider(
+                        "Capital Gains Tax",
+                        min_value=0,
+                        max_value=100,
+                        value=0,
+                        step=1,
+                        help="Tax rate on profits"
+                    )
+                with col_tax_2:
+                    tax_period = st.segmented_control(
+                        "Pay Tax every:",
+                        period_cycle_choice,
+                        key="Tax period",
+                        help="When taxes are paid"
+                    )
+
+            # Risk Management
+            with st.container():
+                col_risk_1, col_risk_2 = st.columns(2)
+                with col_risk_1:
+                    user_risk_pct = st.number_input(
+                        "Risk per trade as a % of bankroll",
+                        min_value=0.1,
+                        max_value=100.00,
+                        value=2.0,
+                        step=0.1,
+                        help="Percentage of capital risked per trade"
+                    )
+                with col_risk_2:
+                    user_risk_adj_period = st.segmented_control(
+                        "Adjust Risk every:",
+                        period_cycle_choice,
+                        key="Adjust risk period",
+                        help="When risk percentage is recalculated"
+                    )
+        st.form_submit_button("Calculate")
+    # End of FORM
+    return {'win_probability_pct': win_probability_pct,
+            'win_reward_R': win_reward_R,
+            'no_of_opportunities_per_period': no_of_opportunities_per_period,
+            'no_of_periods': no_of_periods,
+            'no_of_cycles': no_of_cycles,
+            'starting_account_balance': starting_account_balance,
+            'ending_account_balance': ending_account_balance,
+            'add_to_account_value': add_to_account_value,
+            'add_to_account_period': add_to_account_period,
+            'withdraw_from_account_value': withdraw_from_account_value,
+            'withdraw_from_account_period': withdraw_from_account_period,
+            'tax_value_pct': tax_value_pct,
+            'tax_period': tax_period,
+            'user_risk_pct': user_risk_pct,
+            'user_risk_adj_period': user_risk_adj_period
+            }
+
+
 # Sidebar
 with st.sidebar:
     st.header("About Performance")
@@ -41,168 +308,13 @@ with st.sidebar:
     st.markdown("[ClockTrades.com - Free Trading Tools](https://clocktrades.com/free-trading-tools/)")
     st.caption("*For educational purposes only*")
 
-# Put everything in a FORM
-with st.form(key="Setup calculations"):
-    # Trading System Setup Section
-    col1, col2 = st.columns(2)
-    with col1:
-        st.header("🧮 Strategy Setup")
-        st.subheader("Trading System")
-        win_probability_pct = st.slider(
-            "**Win Probability (%)**",
-            min_value=1,
-            max_value=100,
-            value=40,
-            help="Percentage of trades that are winners"
-        )
-
-        win_reward_R = st.slider(
-            "**Reward to Risk Ratio**",
-            min_value=0.1,
-            max_value=20.0,
-            value=2.0,
-            step=0.1,
-            help="Profit potential relative to your risk (e.g., 2.0 = 2:1 ratio)"
-        )
-
-        st.subheader("Time Horizon")
-        no_of_opportunities_per_period = st.slider(
-            "**Opportunities per Period**",
-            min_value=1,
-            max_value=100,
-            value=10,
-            help="Number of trading opportunities in a given time period"
-        )
-
-        no_of_periods = st.slider(
-            "**Periods per Cycle**",
-            min_value=1,
-            max_value=200,
-            value=12,
-            help="Number of periods in each cycle (e.g., months in a year)"
-        )
-
-        no_of_cycles = st.slider(
-            "**Number of Cycles**",
-            min_value=1,
-            max_value=50,
-            value=30,
-            help="Total cycles to simulate (e.g., years)"
-        )
-
-    with col2:
-        st.header("💰Account Management")
-        # Use list as an input for Period or Cycle choice
-        period_cycle_choice = ["Period", "Cycle"]
-
-        # Container for account balance - we want to know starting balance and the users target
-        with st.container():
-            st.subheader("Capital Setup")
-            col_balance_1, col_balance_2 = st.columns(2)
-            with col_balance_1:
-                starting_account_balance = st.number_input(
-                    "Start Account Balance",
-                    min_value=500,
-                    max_value=1000000,
-                    value=1000,
-                    help="Initial trading capital"
-                )
-            with col_balance_2:
-                ending_account_balance = st.number_input(
-                    "End Account Balance",
-                    min_value=starting_account_balance,
-                    max_value=100000000,
-                    value=1000000,
-                    help="Financial target"
-                )
-
-        # We want to know if user wants to add to the account per period or cycle
-        with st.container():
-            st.subheader("Cash Flows")
-            col_add_1, col_add_2 = st.columns(2)
-            with col_add_1:
-                add_to_account_value = st.number_input(
-                    "Regular Contributions($)",
-                    min_value=0,
-                    max_value=10000,
-                    value=0,
-                    help="Amount added to account regularly"
-                )
-            with col_add_2:
-                add_to_account_period = st.segmented_control(
-                    "Contribution Frequency",
-                    period_cycle_choice,
-                    key="Add period",
-                    help="When contributions are made"
-                )
-
-        # We want to know if user wants to add to the account per period or cycle
-        with st.container():
-            col_withdraw_1, col_withdraw_2 = st.columns(2)
-            with col_withdraw_1:
-                withdraw_from_account_value = st.number_input(
-                    "Regular Withdrawals ($)",
-                    min_value=0,
-                    max_value=10000,
-                    value=0,
-                    help="Amount withdrawn from account regularly"
-                )
-            with col_withdraw_2:
-                withdraw_from_account_period = st.segmented_control(
-                    "Withdrawal Frequency",
-                    period_cycle_choice,
-                    key="Withdraw period",
-                    help="User wants to withdraw certain amount of money to the account per Period or Cycle"
-                )
-
-        # Tax
-        with st.container():
-            st.subheader("Risk & Tax Management")
-            col_tax_1, col_tax_2 = st.columns(2)
-            with col_tax_1:
-                tax_value_pct = st.slider(
-                    "Capital Gains Tax",
-                    min_value=0,
-                    max_value=100,
-                    value=0,
-                    step=1,
-                    help="Tax rate on profits"
-                )
-            with col_tax_2:
-                tax_period = st.segmented_control(
-                    "Pay Tax every:",
-                    period_cycle_choice,
-                    key="Tax period",
-                    help="When taxes are paid"
-                )
-
-        # Risk Management
-        with st.container():
-
-            col_risk_1, col_risk_2 = st.columns(2)
-            with col_risk_1:
-                user_risk_pct = st.number_input(
-                    "Risk per trade as a % of bankroll",
-                    min_value=0.1,
-                    max_value=100.00,
-                    value=2.0,
-                    step=0.1,
-                    help="Percentage of capital risked per trade"
-                )
-            with col_risk_2:
-                user_risk_adj_period = st.segmented_control(
-                    "Adjust Risk every:",
-                    period_cycle_choice,
-                    key="Adjust risk period",
-                    help="When risk percentage is recalculated"
-                )
-    st.form_submit_button("Calculate")
-# End of FORM
+# Put everything in a FORM and return as a dictionary
+user_inputs = create_user_form()
 
 # Calculations section:
-expectancy = calculate_expectancy(win_probability_pct, win_reward_R)
-r_return_per_period = round(expectancy * no_of_opportunities_per_period, 1)
-kelly_percentage = calculate_kelly_criterion(win_probability_pct, win_reward_R) * 100
+expectancy = calculate_expectancy(user_inputs['win_probability_pct'], user_inputs['win_reward_R'])
+r_return_per_period = round(expectancy * user_inputs['no_of_opportunities_per_period'], 1)
+kelly_percentage = calculate_kelly_criterion(user_inputs['win_probability_pct'], user_inputs['win_reward_R']) * 100
 kelly_percentage = max(0, kelly_percentage)
 
 # Strategy Summary
@@ -218,8 +330,8 @@ with strategy_container:
     with col_metric3:
         st.metric("Kelly Criterion", f"{kelly_percentage:.2f}%", help="Optimal risk percentage")
     with col_metric4:
-        risk_comparison = "✅ Below Kelly" if user_risk_pct < kelly_percentage else "⚠️ Above Kelly"
-        st.metric("Your Risk Level", f"{user_risk_pct}%", risk_comparison)
+        risk_comparison = "✅ Below Kelly" if user_inputs['user_risk_pct'] < kelly_percentage else "⚠️ Above Kelly"
+        st.metric("Your Risk Level", f"{user_inputs['user_risk_pct']}%", risk_comparison)
 
 
 # Visualisation section
@@ -234,93 +346,22 @@ with (visualisation_container):
     # Present data in tabs - one for table and one for chart
     tab1, tab2, tab3, tab4 = st.tabs(["DataTable", "Chart", "Summary Table", "Summary"])
     with tab1:
-        # Create DataFrame for the compound rate results
-        compound_interest_result_df = pd.DataFrame()
 
-        # Enter the loop - cycles contains periods
-        list_of_possible_R_outcomes = [win_reward_R, -1]
-        for simulation in range(1, 101):
-            # Take start balance before entering the new cycle loop
-            start_balance = starting_account_balance
-            # Set the initial risk before entering the new cycle loop
-            risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
-
-            for cycle in range(1, no_of_cycles+1):
-                return_per_cycle = []
-                # Generate list of trade outcomes per cycle
-                list_of_trade_outcomes = random.choices(
-                    list_of_possible_R_outcomes,
-                    weights=[win_probability_pct, 100-win_probability_pct],
-                    k=no_of_opportunities_per_period*no_of_periods
-                )
-
-                for period in range(1, no_of_periods+1):
-                    # Work only until the account target has been reached
-                    if (start_balance >= ending_account_balance) or (start_balance <= 0):
-                        break
-                    # Adjust risk if user adapts risk per cycle or per period
-                    # in other cases or never it nothing is chosen
-                    if (period == 1) and (user_risk_adj_period == "Cycle"):
-                        risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
-                    elif user_risk_adj_period == "Period":
-                        risk_per_trade = round(start_balance * user_risk_pct / 100, 0)
-                    else:
-                        risk_per_trade = risk_per_trade
-
-                    # Calculations required per period
-                    list_of_trade_outcomes_in_period = list_of_trade_outcomes[
-                        period*no_of_opportunities_per_period-no_of_opportunities_per_period:period*no_of_opportunities_per_period]
-                    real_r_return_per_period = sum(list_of_trade_outcomes_in_period)
-
-                    no_of_wins_in_period = list_of_trade_outcomes_in_period.count(list_of_possible_R_outcomes[0])
-                    no_of_loses_in_period = len(list_of_trade_outcomes_in_period) - no_of_wins_in_period
-                    return_on_period = real_r_return_per_period * risk_per_trade
-                    return_per_cycle.append(return_on_period)
-                    tax_withheld = round(return_on_period * tax_value_pct / 100, 0) if tax_period == "Period" else 0
-                    add_to_account = add_to_account_value if add_to_account_period == "Period" else 0
-                    withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Period" else 0
-
-                    # Calculations required if user choose Cycle in some cases rather than Period
-                    if period == no_of_periods:
-                        add_to_account = add_to_account_value if add_to_account_period == "Cycle" else add_to_account
-                        withdraw_from_account = withdraw_from_account_value if withdraw_from_account_period == "Cycle" else withdraw_from_account
-                        tax_withheld = sum(return_per_cycle) * tax_value_pct / 100 if tax_period == "Cycle" else tax_withheld
-
-                    end_balance = round(start_balance + return_on_period + add_to_account - withdraw_from_account - tax_withheld, 0)
-
-                    # Create new row per each period and later concatenate it with the existing DataFrame
-                    new_row_df = pd.DataFrame(
-                        {
-                            "Sim": simulation,
-                            "Cycle": cycle,
-                            "Period": period,
-                            "Wins": no_of_wins_in_period,
-                            "Losses": no_of_loses_in_period,
-                            "Win Rate": no_of_wins_in_period / len(list_of_trade_outcomes_in_period) * 100,
-                            "Start Balance": start_balance,
-                            "Risk": risk_per_trade,
-                            "Return": return_on_period,
-                            "Added": add_to_account,
-                            "Withdrawn": withdraw_from_account,
-                            "Tax": tax_withheld,
-                            "End Balance": end_balance
-                        },
-                        index=[0])
-
-                    compound_interest_result_df = pd.concat([compound_interest_result_df, new_row_df], ignore_index=True)
-                    compound_interest_result_df['Peak Balance'] = compound_interest_result_df.groupby('Sim')['End Balance'].cummax()
-                    compound_interest_result_df['Drawdown'] = compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance']
-                    compound_interest_result_df['Drawdown pct'] = round(
-                        (compound_interest_result_df['Peak Balance'] - compound_interest_result_df['End Balance']) /
-                        compound_interest_result_df['Peak Balance'] * 100, 1)
-
-                    start_balance = end_balance
-
+        # Calculate results
+        compound_interest_result_df = calculate_simulated_results(
+            user_inputs['win_probability_pct'], user_inputs['win_reward_R'],
+            user_inputs['no_of_opportunities_per_period'], user_inputs['no_of_periods'],
+            user_inputs['no_of_cycles'], user_inputs['starting_account_balance'],
+            user_inputs['ending_account_balance'],
+            user_inputs['add_to_account_value'], user_inputs['add_to_account_period'],
+            user_inputs['withdraw_from_account_value'], user_inputs['withdraw_from_account_period'],
+            user_inputs['tax_value_pct'], user_inputs['tax_period'],
+            user_inputs['user_risk_pct'], user_inputs['user_risk_adj_period'])
         # Show DataFrame
         # sim_to_show = st.number_input("Simulation number to show", 1, 100, 1, key="sim_no_choice")
 
         if "sim_to_show" not in st.session_state:
-            st.session_state.sim_to_show=1
+            st.session_state.sim_to_show = 1
 
         col1a, col2a = st.columns(2)
         with col1a:
@@ -416,6 +457,8 @@ with (visualisation_container):
             ))
 
     # Summary statistics
+    # TODO: Add max, min winning streak
+    # TODO: Add max, min drawdown in percentage points
     with tab4:
         no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
         min_end_balance = no_ruin_summary_df["END_Balance"].min()
@@ -444,16 +487,16 @@ with st.expander("💡 How to Interpret These Results"):
 
     **Formula**: `A = P × (1 + r/n)^(n×t)`
     - **A**: End balance
-    - **P**: Starting balance ({starting_account_balance:,.0f})
+    - **P**: Starting balance ({user_inputs['starting_account_balance']:,.0f})
     - **r**: Expected return per period ({r_return_per_period:.1f}R)
-    - **n**: Opportunities per period ({no_of_opportunities_per_period})
-    - **t**: Total periods ({no_of_periods * no_of_cycles})
+    - **n**: Opportunities per period ({user_inputs['no_of_opportunities_per_period']})
+    - **t**: Total periods ({user_inputs['no_of_periods'] * user_inputs['no_of_cycles']})
 
     **Key Insights**:
     - **Expectancy**: {expectancy:.2f}R per trade
     - **Kelly Criterion**: Risk {kelly_percentage:.2f}% per trade (half-Kelly: {kelly_percentage/2:.2f}%)
     - **End Balance**: {compound_interest_result_df['End Balance'].iloc[-1]:,.0f}
-    - **Risk Management**: Adjust risk per {user_risk_adj_period} for balance.
+    - **Risk Management**: Adjust risk per {user_inputs['user_risk_adj_period']} for balance.
     """)
 
 
