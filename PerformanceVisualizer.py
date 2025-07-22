@@ -341,7 +341,7 @@ with strategy_container:
 
 # Visualisation section
 visualisation_container = st.container()
-with (visualisation_container):
+with ((visualisation_container)):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
     **Visualizing how your trading strategy compounds over time**  
@@ -463,7 +463,6 @@ with (visualisation_container):
 
     # Summary statistics
     # TODO: Add max, min winning streak
-    # TODO: Add min, max return per period
     # TODO: Add min, max and average cycle when simulation ends (hit target)
     with tab4:
         no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
@@ -471,6 +470,8 @@ with (visualisation_container):
         max_end_balance = no_ruin_summary_df["END_Balance"].max()
         avg_end_balance = no_ruin_summary_df["END_Balance"].mean()
         risk_of_ruin_pct = len(summary_df[summary_df["END_Balance"] <= 0])
+        min_return_period = no_ruin_summary_df["AVG_Return"].min()
+        max_return_period = no_ruin_summary_df["AVG_Return"].max()
         avg_return_period = no_ruin_summary_df["AVG_Return"].mean()
         max_drawdown = no_ruin_summary_df["MAX_Drawdown"].max()
         min_drawdown = no_ruin_summary_df["MAX_Drawdown"].min()
@@ -478,7 +479,10 @@ with (visualisation_container):
         max_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].max()
         min_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].min()
         avg_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].mean()
+
         with st.container():
+            st.metric("Risk of Ruin", f"{risk_of_ruin_pct:,.1f}%", help="Chances of account blowout")
+
             row1a, row1b, row1c = st.columns(3)
             with row1a:
                 st.metric("Minimum End Balance", f"${min_end_balance:,.0f}", help="The lowest of the ending balances")
@@ -488,7 +492,10 @@ with (visualisation_container):
                 st.metric("Average End Balance", f"${avg_end_balance:,.0f}", help="The average of the ending balances")
             row2a, row2b, row2c = st.columns(3)
             with row2a:
-                st.metric("Risk of Ruin", f"{risk_of_ruin_pct:,.1f}%", help="Chances of account blowout")
+                st.metric("Min Return Per Period", f"${min_return_period:,.1f}", help="Minimum expected return per Period")
+            with row2b:
+                st.metric("Max Return Per Period", f"${max_return_period:,.1f}", help="Maximum expected return per Period")
+
             with row2c:
                 st.metric("Average Return Per Period", f"${avg_return_period:,.1f}", help="Average expected return per Period")
             row3a, row3b, row3c = st.columns(3)
