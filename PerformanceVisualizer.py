@@ -463,7 +463,8 @@ with (visualisation_container):
 
     # Summary statistics
     # TODO: Add max, min winning streak
-    # TODO: Add max, min drawdown in percentage points
+    # TODO: Add min, max return per period
+    # TODO: Add min, max and average cycle when simulation ends (hit target)
     with tab4:
         no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
         min_end_balance = no_ruin_summary_df["END_Balance"].min()
@@ -474,16 +475,36 @@ with (visualisation_container):
         max_drawdown = no_ruin_summary_df["MAX_Drawdown"].max()
         min_drawdown = no_ruin_summary_df["MAX_Drawdown"].min()
         avg_drawdown = no_ruin_summary_df["MAX_Drawdown"].mean()
-
-        st.metric("Minimum End Balance", f"${min_end_balance}", help="The lowest of the ending balances")
-        st.metric("Maximum End Balance", f"${max_end_balance}", help="The highest of the ending balances")
-        st.metric("Average End Balance", f"${avg_end_balance}", help="The average of the ending balances")
-        st.metric("Risk of Ruin", f"{risk_of_ruin_pct}%", help="Chances of account blowout")
-        st.metric("Average Return Per Period", f"${avg_return_period}", help="Average expected return per Period")
-        st.metric("Minimum Drawdown", f"${min_drawdown}", help="The lowest of the drawdowns")
-        st.metric("Maximum Drawdown", f"${max_drawdown}", help="The highest of the drawdowns")
-        st.metric("Average Drawdown", f"${avg_drawdown}", help="The average of the drawdowns")
-
+        max_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].max()
+        min_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].min()
+        avg_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].mean()
+        with st.container():
+            row1a, row1b, row1c = st.columns(3)
+            with row1a:
+                st.metric("Minimum End Balance", f"${min_end_balance:,.0f}", help="The lowest of the ending balances")
+            with row1b:
+                st.metric("Maximum End Balance", f"${max_end_balance:,.0f}", help="The highest of the ending balances")
+            with row1c:
+                st.metric("Average End Balance", f"${avg_end_balance:,.0f}", help="The average of the ending balances")
+            row2a, row2b, row2c = st.columns(3)
+            with row2a:
+                st.metric("Risk of Ruin", f"{risk_of_ruin_pct:,.1f}%", help="Chances of account blowout")
+            with row2c:
+                st.metric("Average Return Per Period", f"${avg_return_period:,.1f}", help="Average expected return per Period")
+            row3a, row3b, row3c = st.columns(3)
+            with row3a:
+                st.metric("Minimum Drawdown", f"${min_drawdown:,.0f}", help="The lowest of the drawdowns")
+            with row3b:
+                st.metric("Maximum Drawdown", f"${max_drawdown:,.0f}", help="The highest of the drawdowns")
+            with row3c:
+                st.metric("Average Drawdown", f"${avg_drawdown:,.0f}", help="The average of the drawdowns")
+            row4a, row4b, row4c = st.columns(3)
+            with row4a:
+                st.metric("Minimum Drawdown %", f"{min_drawdown_pct:,.1f}%", help="The lowest of the drawdowns in pct")
+            with row4b:
+                st.metric("Maximum Drawdown %", f"{max_drawdown_pct:,.1f}%", help="The highest of the drawdowns in pct")
+            with row4c:
+                st.metric("Average Drawdown %", f"{avg_drawdown_pct:,.1f}%", help="The average of the drawdowns in pct")
 
 # Explanation
 with st.expander("💡 How to Interpret These Results"):
