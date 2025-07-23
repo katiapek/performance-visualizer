@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import random
+import math
 
 # Page headers
 st.set_page_config(page_title="Trading Strategy Performance Visualizer", layout="wide", page_icon="📈")
@@ -295,6 +296,22 @@ def clear_session_state():
     return st.session_state.sim_to_show
 
 
+def calculate_min_max_avg_cycle(df, no_of_periods):
+    df = df.copy()
+    df["In_Periods"] = df["END_Cycle"] * no_of_periods + df["END_Period"]
+    min_periods = df["In_Periods"].min()
+    max_periods = df["In_Periods"].max()
+    avg_periods = df["In_Periods"].mean()
+    return {
+        "MIN_Cycle": math.floor(min_periods/no_of_periods),
+        "MIN_Period": min_periods%no_of_periods,
+        "MAX_Cycle": math.floor(max_periods/no_of_periods),
+        "MAX_Period": max_periods%no_of_periods,
+        "AVG_Cycle": math.floor(avg_periods/no_of_periods),
+        "AVG_Period": avg_periods%no_of_periods
+    }
+
+
 # Sidebar
 with st.sidebar:
     st.header("About Performance")
@@ -341,7 +358,7 @@ with strategy_container:
 
 # Visualisation section
 visualisation_container = st.container()
-with ((visualisation_container)):
+with (visualisation_container):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
     **Visualizing how your trading strategy compounds over time**  
@@ -479,6 +496,8 @@ with ((visualisation_container)):
         max_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].max()
         min_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].min()
         avg_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].mean()
+        min_max_avg_cycle = calculate_min_max_avg_cycle(no_ruin_summary_df[["END_Cycle","END_Period"]],
+                                                        user_inputs["no_of_periods"])
 
         with st.container():
             st.metric("Risk of Ruin", f"{risk_of_ruin_pct:,.1f}%", help="Chances of account blowout")
@@ -495,7 +514,6 @@ with ((visualisation_container)):
                 st.metric("Min Return Per Period", f"${min_return_period:,.1f}", help="Minimum expected return per Period")
             with row2b:
                 st.metric("Max Return Per Period", f"${max_return_period:,.1f}", help="Maximum expected return per Period")
-
             with row2c:
                 st.metric("Average Return Per Period", f"${avg_return_period:,.1f}", help="Average expected return per Period")
             row3a, row3b, row3c = st.columns(3)
@@ -512,6 +530,18 @@ with ((visualisation_container)):
                 st.metric("Maximum Drawdown %", f"{max_drawdown_pct:,.1f}%", help="The highest of the drawdowns in pct")
             with row4c:
                 st.metric("Average Drawdown %", f"{avg_drawdown_pct:,.1f}%", help="The average of the drawdowns in pct")
+            row5a, row5b, row5c = st.columns(3)
+            with row5a:
+                st.metric("Minimum Cycle/Period",
+                          f"{min_max_avg_cycle['MIN_Cycle']:,.0f}/{min_max_avg_cycle['MIN_Period']:,.0f}", help="The lowest cycle/period")
+            with row5b:
+                st.metric("Maximum Cycle/Period",
+                          f"{min_max_avg_cycle['MAX_Cycle']:,.0f}/{min_max_avg_cycle['MAX_Period']:,.0f}",
+                          help="The highest cycle/period")
+            with row5c:
+                st.metric("Average Cycle/Period",
+                          f"{min_max_avg_cycle['AVG_Cycle']:,.0f}/{min_max_avg_cycle['AVG_Period']:,.0f}",
+                          help="The average cycle/period")
 
 # Explanation
 with st.expander("💡 How to Interpret These Results"):
