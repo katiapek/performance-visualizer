@@ -9,8 +9,8 @@ st.set_page_config(page_title="Trading Strategy Performance Visualizer", layout=
 
 st.title("💸 Trading Strategy Performance Visualizer")
 st.markdown("""
-**Visualize how ...**  
-*This calculator visualizes...*
+**Simulate 100 Possible Futures for Your Trading Strategy**  
+*This calculator models probabilistic outcomes based on your win rate, risk/reward, and position sizing*
 """)
 
 
@@ -24,13 +24,40 @@ def calculate_kelly_criterion(win_probability, win_reward):
     return round((win_decimal-(loss_decimal/win_reward)), 4)
 
 
-@st.cache_data
+@st.cache_data(show_spinner="Running 100 simulations... This takes ~10-30 seconds",
+               ttl=3600,  # Keep for 1 hour
+               hash_funcs={pd.DataFrame: lambda _: None})  # Don't hash large DataFrames
 def calculate_simulated_results(win_probability, win_reward_r, no_of_opportunities, no_periods,
                                 no_cycles, starting_balance, ending_balance,
                                 add_value, add_period,
                                 withdraw_value, withdraw_period,
                                 taxes_value, taxes_period, user_risk, user_risk_period):
+    """
+    Runs Monte Carlo simulation of trading strategy performance
 
+    Parameters:
+    win_probability (int): Win rate percentage (1-100)
+    win_reward_r (float): Reward:Risk ratio
+    no_of_opportunities (int): Trades per period
+    no_periods (int): Periods per cycle
+    no_cycles (int): Total cycles to simulate
+    starting_balance (float): Initial account balance
+    ending_balance (float): Target account balance
+    add_value (float): Regular contributions amount
+    add_period (str): 'Period' or 'Cycle' for contributions
+    withdraw_value (float): Regular withdrawals amount
+    withdraw_period (str): 'Period' or 'Cycle' for withdrawals
+    taxes_value (float): Tax rate percentage (0-100)
+    taxes_period (str): 'Period' or 'Cycle' for tax payments
+    user_risk (float): Risk percentage per trade
+    user_risk_period (str): When to adjust risk % ('Period'/'Cycle')
+
+    Returns:
+    DataFrame: Simulation results with columns:
+        [Sim, Cycle, Period, Wins, Losses, Win Rate,
+         Start Balance, Risk, Return, Added, Withdrawn,
+         Tax, End Balance, Peak Balance, Drawdown, Drawdown pct]
+    """
     # Create DataFrame for the compound rate results
     result_df = pd.DataFrame()
 
@@ -304,31 +331,50 @@ def calculate_min_max_avg_cycle(df, no_of_periods):
     avg_periods = df["In_Periods"].mean()
     return {
         "MIN_Cycle": math.floor(min_periods/no_of_periods),
-        "MIN_Period": min_periods%no_of_periods,
+        "MIN_Period": min_periods % no_of_periods,
         "MAX_Cycle": math.floor(max_periods/no_of_periods),
-        "MAX_Period": max_periods%no_of_periods,
+        "MAX_Period": max_periods % no_of_periods,
         "AVG_Cycle": math.floor(avg_periods/no_of_periods),
-        "AVG_Period": avg_periods%no_of_periods
+        "AVG_Period": avg_periods % no_of_periods
     }
 
 
 # Sidebar
 with st.sidebar:
-    st.header("About Performance")
+    st.header("📊 About Trading Performance")
     st.markdown("""
-    **Formula**: `Earn and not ruin (lol)`
-    - **A**: End balance
-    - **P**: Starting balance
-    - **r**: Expected return per period (based on expectancy)
-    - **n**: Number of compounding periods per cycle
-    - **t**: Number of cycles
+    **Monte Carlo Simulation Insights:**
+    - Simulates 100 possible futures for your strategy
+    - Accounts for random win/loss sequences
+    - Models compounding with risk-adjusted position sizing
 
-    In trading, we compound the **risk per trade** (adjusted as a percentage of the account balance), factoring in wins, losses, taxes, and cash flows.
+    **Key Metrics Tracked:**
+    - Account growth trajectory
+    - Maximum drawdown
+    - Risk of ruin
+    - Time to reach target
     """)
+
+    st.subheader("Performance Formula")
+    st.markdown("""
+    ```
+    Ending Balance = Start Balance × (1 + Growth Rate)^n
+    Growth Rate = Expectancy × Risk % × Opportunities
+    ```
+    """)
+
+# TODO: Correct LINKS - link to markets&manners
     st.markdown("---")
-    st.markdown("For more Free Tools Visit:")
-    st.markdown("[ClockTrades.com - Free Trading Tools](https://clocktrades.com/free-trading-tools/)")
-    st.caption("*For educational purposes only*")
+    st.markdown("### 📚 Educational Resources")
+    st.markdown("""
+    - [Risk Management Guide](https://clocktrades.com/risk-management)
+    - [Position Sizing Strategies](https://clocktrades.com/position-sizing)
+    - [Compounding Calculator](https://clocktrades.com/compounding)
+    """)
+
+    st.markdown("---")
+    st.markdown("Made by [ClockTrades](https://clocktrades.com)")
+    st.caption("*Simulated results don't guarantee future performance*")
 
 # Put everything in a FORM and return as a dictionary
 user_inputs = create_user_form()
@@ -342,18 +388,21 @@ kelly_percentage = max(0, kelly_percentage)
 # Strategy Summary
 strategy_container = st.container()
 
-with strategy_container:
+with ((strategy_container)):
     st.header("📊 Strategy Performance Assumptions")
     col_metric1, col_metric2, col_metric3, col_metric4 = st.columns(4)
     with col_metric1:
-        st.metric("Expectancy per Trade", f"{expectancy}R", help="Average return per $1 risked")
+        st.metric("Expectancy/Trade", f"{expectancy}R", "Avg $ per $ risked",
+                  help="(Win% × Avg Win) - (Loss% × Avg Loss)")
     with col_metric2:
-        st.metric("Period Return", f"{r_return_per_period}R", help="Total return per period")
+        st.metric("Period Return", f"{r_return_per_period}R",
+                            f"{user_inputs["no_of_opportunities_per_period"]} trades/period",
+                            help="Expectancy × Opportunities per Period")
     with col_metric3:
-        st.metric("Kelly Criterion", f"{kelly_percentage:.2f}%", help="Optimal risk percentage")
+        risk_status = "🟢 Conservative" if user_inputs['user_risk_pct'] < kelly_percentage / 2 else "🟠 Moderate" if user_inputs['user_risk_pct'] < kelly_percentage else "🔴 Aggressive"
+        st.metric("Risk Level", f"{user_inputs['user_risk_pct']}%", risk_status, help=f"Kelly: {kelly_percentage:.1f}% | Half-Kelly: {kelly_percentage/2:.1f}%")
     with col_metric4:
-        risk_comparison = "✅ Below Kelly" if user_inputs['user_risk_pct'] < kelly_percentage else "⚠️ Above Kelly"
-        st.metric("Your Risk Level", f"{user_inputs['user_risk_pct']}%", risk_comparison)
+        st.metric("Simulations", "100 runs", "Monte Carlo model", help="100 randomized sequences of wins/losses")
 
 
 # Visualisation section
@@ -361,8 +410,8 @@ visualisation_container = st.container()
 with (visualisation_container):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
-    **Visualizing how your trading strategy compounds over time**  
-    *The chart below shows your account growth trajectory based on the parameters you've set*
+    **Explore Different Simulation Outcomes (Use Arrows Below)**  
+    *Each simulation shows how random win/loss sequences affect your results*
     """)
 
     # Present data in tabs - one for table and one for chart
@@ -385,17 +434,21 @@ with (visualisation_container):
         if "sim_to_show" not in st.session_state:
             st.session_state.sim_to_show = 1
 
-        col1a, col2a = st.columns(2)
-        with col1a:
-            if st.button("Previous"):
+        nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+        with nav_col1:
+            if st.button("◀ Previous Simulation", use_container_width=True):
                 st.session_state.sim_to_show = max(1, st.session_state.sim_to_show - 1)
-        with col2a:
-            if st.button("Next"):
+        with nav_col2:
+            sim_num = st.number_input("Select Simulation", 1, 100, st.session_state.sim_to_show,
+                                      key="sim_select", label_visibility="collapsed")
+            st.session_state.sim_to_show = sim_num
+        with nav_col3:
+            if st.button("Next Simulation ▶", use_container_width=True):
                 st.session_state.sim_to_show = min(100, st.session_state.sim_to_show + 1)
 
-        st.write(f"Showing simulation: {st.session_state.sim_to_show}")
+        st.progress(st.session_state.sim_to_show / 100,
+                    f"Simulation {st.session_state.sim_to_show}/100")
 
-        # st.session_state.sim_to_show = st.number_input("Simulation number to show", 1, 100, 1)
 
         run_to_show_df = compound_interest_result_df[compound_interest_result_df["Sim"] == st.session_state.sim_to_show]
 
@@ -480,7 +533,6 @@ with (visualisation_container):
 
     # Summary statistics
     # TODO: Add max, min winning streak
-    # TODO: Add min, max and average cycle when simulation ends (hit target)
     with tab4:
         no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
         min_end_balance = no_ruin_summary_df["END_Balance"].min()
@@ -496,7 +548,7 @@ with (visualisation_container):
         max_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].max()
         min_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].min()
         avg_drawdown_pct = no_ruin_summary_df["MAX_Drawdown_pct"].mean()
-        min_max_avg_cycle = calculate_min_max_avg_cycle(no_ruin_summary_df[["END_Cycle","END_Period"]],
+        min_max_avg_cycle = calculate_min_max_avg_cycle(no_ruin_summary_df[["END_Cycle", "END_Period"]],
                                                         user_inputs["no_of_periods"])
 
         with st.container():
@@ -544,24 +596,20 @@ with (visualisation_container):
                           help="The average cycle/period")
 
 # Explanation
-with st.expander("💡 How to Interpret These Results"):
+with st.expander("💡 How to Interpret These Results", expanded=True):
     st.markdown(f"""
-    Your trading strategy's performance is modeled using the **compound interest formula** adapted for trading risk:
+    ### Understanding Your Simulation Results
 
-    **Formula**: `A = P × (1 + r/n)^(n×t)`
-    - **A**: End balance
-    - **P**: Starting balance ({user_inputs['starting_account_balance']:,.0f})
-    - **r**: Expected return per period ({r_return_per_period:.1f}R)
-    - **n**: Opportunities per period ({user_inputs['no_of_opportunities_per_period']})
-    - **t**: Total periods ({user_inputs['no_of_periods'] * user_inputs['no_of_cycles']})
+    **Strategy Profile:**
+    - **{user_inputs['win_probability_pct']}% win rate** with **{user_inputs['win_reward_R']}:1 risk-reward ratio**
+    - Risking **{user_inputs['user_risk_pct']}%** of account per trade
+    - **Kelly-optimal risk: {kelly_percentage:.1f}%** | **Half-Kelly: {kelly_percentage / 2:.1f}%**
 
-    **Key Insights**:
-    - **Expectancy**: {expectancy:.2f}R per trade
-    - **Kelly Criterion**: Risk {kelly_percentage:.2f}% per trade (half-Kelly: {kelly_percentage/2:.2f}%)
-    - **End Balance**: {compound_interest_result_df['End Balance'].iloc[-1]:,.0f}
-    - **Risk Management**: Adjust risk per {user_inputs['user_risk_adj_period']} for balance.
+    **Key Observations from 100 Simulations:**
+    1. **Success Rate**: {100 - risk_of_ruin_pct}% of simulations reached the target without ruin
+    2. **Growth Pattern**: {'Exponential' if expectancy > 0.3 else 'Linear' if expectancy > 0 else 'Negative'} growth profile
+    3. **Volatility**: Typical drawdowns between {min_drawdown_pct:.1f}%-{max_drawdown_pct:.1f}%
     """)
-
 
 # Footer
 st.markdown("---")
