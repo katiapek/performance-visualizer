@@ -339,6 +339,20 @@ def calculate_min_max_avg_cycle(df, no_of_periods):
     }
 
 
+def create_distribution_chart(df, df_label, x_label, y_label):
+    fig_distribution = go.Figure(data=[go.Histogram(x=df, histnorm='probability')])
+
+    fig_distribution.update_layout(
+        title=df_label,
+        xaxis_title=x_label,
+        yaxis_title=y_label,
+        hovermode="x unified",
+        template="plotly_white",
+    )
+
+    return fig_distribution
+
+
 # Sidebar
 with st.sidebar:
     st.header("📊 About Trading Performance")
@@ -414,20 +428,20 @@ with (visualisation_container):
     *Each simulation shows how random win/loss sequences affect your results*
     """)
 
-    # Present data in tabs - one for table and one for chart
-    tab1, tab2, tab3, tab4 = st.tabs(["DataTable", "Chart", "Summary Table", "Summary"])
-    with tab1:
+    # Calculate results
+    compound_interest_result_df = calculate_simulated_results(
+        user_inputs['win_probability_pct'], user_inputs['win_reward_R'],
+        user_inputs['no_of_opportunities_per_period'], user_inputs['no_of_periods'],
+        user_inputs['no_of_cycles'], user_inputs['starting_account_balance'],
+        user_inputs['ending_account_balance'],
+        user_inputs['add_to_account_value'], user_inputs['add_to_account_period'],
+        user_inputs['withdraw_from_account_value'], user_inputs['withdraw_from_account_period'],
+        user_inputs['tax_value_pct'], user_inputs['tax_period'],
+        user_inputs['user_risk_pct'], user_inputs['user_risk_adj_period'])
 
-        # Calculate results
-        compound_interest_result_df = calculate_simulated_results(
-            user_inputs['win_probability_pct'], user_inputs['win_reward_R'],
-            user_inputs['no_of_opportunities_per_period'], user_inputs['no_of_periods'],
-            user_inputs['no_of_cycles'], user_inputs['starting_account_balance'],
-            user_inputs['ending_account_balance'],
-            user_inputs['add_to_account_value'], user_inputs['add_to_account_period'],
-            user_inputs['withdraw_from_account_value'], user_inputs['withdraw_from_account_period'],
-            user_inputs['tax_value_pct'], user_inputs['tax_period'],
-            user_inputs['user_risk_pct'], user_inputs['user_risk_adj_period'])
+    # Present data in tabs - one for table and one for chart
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Summary Metrics", "Summary Table", "Distributions", "Data Tables", "Charts"])
+    with tab4:
         # Show DataFrame
         # sim_to_show = st.number_input("Simulation number to show", 1, 100, 1, key="sim_no_choice")
 
@@ -472,7 +486,7 @@ with (visualisation_container):
             ),
             hide_index=True, use_container_width=True)
 
-    with tab2:
+    with tab5:
         # Present data in the container with tabs - one for chart, one for data table
         fig = go.Figure()
 
@@ -483,7 +497,6 @@ with (visualisation_container):
             line=dict(color='#3498db', width=3),
             hovertemplate="Cycle: %{customdata[0]}<br>Period: %{customdata[1]}<br>Balance: $%{y:,.0f}<extra></extra>",
             customdata=compound_interest_result_df[["Cycle", "Period"]],
-
         ))
 
         # # Target line
@@ -502,13 +515,12 @@ with (visualisation_container):
             yaxis_title="Account Balance ($)",
             hovermode="x unified",
             template="plotly_white",
-
         )
         st.plotly_chart(fig, config={"displayModeBar": False}, use_container_width=True)
         # else:
         #     st.warning("This expectancy value is not mathematically possible with positive risk:reward ratios")
 
-    with tab3:
+    with tab2:
         summary_df = compound_interest_result_df.groupby("Sim").agg(
             END_Cycle=("Cycle", "last"),
             END_Period=("Period", "last"),
@@ -533,7 +545,7 @@ with (visualisation_container):
 
     # Summary statistics
     # TODO: Add max, min winning streak
-    with tab4:
+    with tab1:
         no_ruin_summary_df = summary_df[summary_df["END_Balance"] > 0]
         min_end_balance = no_ruin_summary_df["END_Balance"].min()
         max_end_balance = no_ruin_summary_df["END_Balance"].max()
@@ -594,6 +606,46 @@ with (visualisation_container):
                 st.metric("Average Cycle/Period",
                           f"{min_max_avg_cycle['AVG_Cycle']:,.0f}/{min_max_avg_cycle['AVG_Period']:,.0f}",
                           help="The average cycle/period")
+    with tab3:
+        col_ch1, col_ch2 = st.columns(2)
+        with col_ch1:
+            st.plotly_chart(
+                create_distribution_chart(
+                    no_ruin_summary_df["AVG_Return"],
+                    "Distribution of Average Returns per Period",
+                    "Average Returns $",
+                    "Probability"
+                ),
+                config={"displayModeBar": False},
+                use_container_width=True)
+        with col_ch2:
+            st.plotly_chart(
+                create_distribution_chart(
+                    no_ruin_summary_df["END_Balance"],
+                    "Distribution of End Balances",
+                    "End Balance $",
+                    "Probability"),
+                config={"displayModeBar": False},
+                use_container_width=True)
+        col_ch3, col_ch4 = st.columns(2)
+        with col_ch3:
+            st.plotly_chart(
+                create_distribution_chart(
+                    no_ruin_summary_df["MAX_Drawdown"],
+                    "Distribution of Maximum Drawdowns",
+                    "Maximum Drawdowns $",
+                    "Probability"),
+                config={"displayModeBar": False},
+                use_container_width=True)
+        with col_ch4:
+            st.plotly_chart(
+                create_distribution_chart(
+                    no_ruin_summary_df["MAX_Drawdown_pct"],
+                    "Distribution of Maximum Drawdowns in Percentage Points",
+                    "Maximum Drawdowns %",
+                    "Probability"),
+                config={"displayModeBar": False},
+                use_container_width=True)
 
 # Explanation
 with st.expander("💡 How to Interpret These Results", expanded=True):
