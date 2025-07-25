@@ -340,7 +340,12 @@ def calculate_min_max_avg_cycle(df, no_of_periods):
 
 
 def create_distribution_chart(df, df_label, x_label, y_label):
-    fig_distribution = go.Figure(data=[go.Histogram(x=df, histnorm='probability')])
+    fig_distribution = go.Figure(data=[go.Histogram(
+        x=df,
+        histnorm='probability',
+        hovertemplate="%{y:,.2f}<extra></extra>",
+
+    )])
 
     fig_distribution.update_layout(
         title=df_label,
@@ -361,6 +366,7 @@ with st.sidebar:
     - Simulates 100 possible futures for your strategy
     - Accounts for random win/loss sequences
     - Models compounding with risk-adjusted position sizing
+    - Model returns results per period, not per trade
 
     **Key Metrics Tracked:**
     - Account growth trajectory
@@ -377,14 +383,14 @@ with st.sidebar:
     ```
     """)
 
-# TODO: Correct LINKS - link to markets&manners
-    st.markdown("---")
-    st.markdown("### 📚 Educational Resources")
-    st.markdown("""
-    - [Risk Management Guide](https://clocktrades.com/risk-management)
-    - [Position Sizing Strategies](https://clocktrades.com/position-sizing)
-    - [Compounding Calculator](https://clocktrades.com/compounding)
-    """)
+#
+#     st.markdown("---")
+#     st.markdown("### 📚 Educational Resources")
+#     st.markdown("""
+#     - [Risk Management Guide](https://clocktrades.com/risk-management)
+#     - [Position Sizing Strategies](https://clocktrades.com/position-sizing)
+#     - [Compounding Calculator](https://clocktrades.com/compounding)
+#     """)
 
     st.markdown("---")
     st.markdown("Made by [ClockTrades](https://clocktrades.com)")
