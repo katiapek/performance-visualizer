@@ -24,7 +24,7 @@ def calculate_kelly_criterion(win_probability, win_reward):
     return round((win_decimal-(loss_decimal/win_reward)), 4)
 
 
-@st.cache_data(show_spinner="Running 100 simulations... This takes ~10-30 seconds",
+@st.cache_data(show_spinner="Running 100 simulations... This takes ~90 seconds",
                ttl=3600,  # Keep for 1 hour
                hash_funcs={pd.DataFrame: lambda _: None})  # Don't hash large DataFrames
 def calculate_simulated_results(win_probability, win_reward_r, no_of_opportunities, no_periods,
@@ -428,7 +428,7 @@ with ((strategy_container)):
 # Visualisation section
 visualisation_container = st.container()
 with (visualisation_container):
-    st.header("🚀 Compounding Growth Simulation")
+    st.header("🏎️ Monte Carlo Simulation")
     st.markdown("""
     **Explore Different Simulation Outcomes**  
     *Each simulation shows how random win/loss sequences affect your results*
