@@ -430,7 +430,7 @@ visualisation_container = st.container()
 with (visualisation_container):
     st.header("🚀 Compounding Growth Simulation")
     st.markdown("""
-    **Explore Different Simulation Outcomes (Use Arrows Below)**  
+    **Explore Different Simulation Outcomes**  
     *Each simulation shows how random win/loss sequences affect your results*
     """)
 
