@@ -383,17 +383,8 @@ with st.sidebar:
     ```
     """)
 
-#
-#     st.markdown("---")
-#     st.markdown("### 📚 Educational Resources")
-#     st.markdown("""
-#     - [Risk Management Guide](https://clocktrades.com/risk-management)
-#     - [Position Sizing Strategies](https://clocktrades.com/position-sizing)
-#     - [Compounding Calculator](https://clocktrades.com/compounding)
-#     """)
-
     st.markdown("---")
-    st.markdown("Made by [ClockTrades](https://clocktrades.com)")
+    st.markdown("Made by [Markets&Manners](https://marketsmanners.com)")
     st.caption("*Simulated results don't guarantee future performance*")
 
 # Put everything in a FORM and return as a dictionary
@@ -671,5 +662,5 @@ with st.expander("💡 How to Interpret These Results", expanded=True):
 
 # Footer
 st.markdown("---")
-st.caption("© 2025 ClockTrades.com • All calculations are theoretical and don't guarantee future results • "
+st.caption("© 2025 MarketsManners.com • All calculations are theoretical and don't guarantee future results • "
            "Risk management is essential in trading")
